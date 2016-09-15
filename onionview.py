@@ -20,14 +20,15 @@
 #
 '''OnionView
 
-Usage: onionview
+Usage: onionview [port]
+
+  port : TCP socket port number to connect to.
 
 '''
 ''' TODO:
 + Display Port in UI
 + Warning against posting screenshots
 + Move Streams if the circuit id has changed ('DETACHED')
-+ Allow specifying port number on commandline
 + Display SOCKS username for streams/circuits
 + Remove closed circuits and streams after a time delay
 + Highlight new entries in treeview for 1 second
@@ -80,6 +81,9 @@ def main(argv):
                     #~ level=logging.DEBUG,
                     #~ #level = logging.ERROR,
                     #~ )
+    global TOR_PORTS
+    if len(argv) > 1 and argv[1].isdigit():
+        TOR_PORTS = (int(argv[1]),)
     root = tk.Tk()
     obj = Controller(root)
     root.mainloop()
