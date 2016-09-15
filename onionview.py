@@ -84,35 +84,35 @@ def main(argv):
     global TOR_PORTS
     if len(argv) > 1 and argv[1].isdigit():
         TOR_PORTS = (int(argv[1]),)
-    root = tk.Tk()
-    obj = Controller(root)
-    root.mainloop()
+    Controller(portlist=TOR_PORTS).run()
+
 
 
 class Controller(object):
 
     def output(self, text):
-        self.output_tab_obj.append_text('{}\n'.format(text))
+        self.output_w.append_text('{}\n'.format(text))
 
-    def __init__(self, root):
-        self.root = root
-        self.output_tab_obj = None
+    def __init__(self, portlist):
+        self.root = None  # Main Tk window
+        self.output_w = None  # Text output widget
         self.treeview = None
 
-        self._init_ui(root)
-        self.torlink_obj = TorLink(self, self.treeview)
+        self._init_ui()
+        self.torlink_obj = TorLink(controller=self, portlist=portlist)
 
-    def _init_ui(self, root):
+    def _init_ui(self):
         # --- Tk init ---
-        self.root.title('Torview')
-        #~ self.root.geometry('1000x1000')
+        self.root = root = tk.Tk()
+        root.title('OnionView')
+        #~ root.geometry('1000x1000')
 
         # Catch the close button
-        self.root.protocol("WM_DELETE_WINDOW", self.cmd_quit)
+        root.protocol("WM_DELETE_WINDOW", self.cmd_quit)
         # Catch the "quit" event.
-        #self.root.createcommand('exit', self.cmd_quit)
+        #root.createcommand('exit', self.cmd_quit)
 
-        self.root.option_add('*tearOff', False)
+        root.option_add('*tearOff', False)
         root.bind('<Alt_L><q>', self.cmd_quit)
 
         # --- Main TreeView ---
@@ -129,7 +129,7 @@ class Controller(object):
 
         outputframe = ttk.Frame(root)#, borderwidth=10, relief='ridge')
         outputframe.grid(row=30, column=0, columnspan=2, sticky='nsew')
-        self.output_tab_obj = OutputW(outputframe, self)
+        self.output_w = OutputW(outputframe, self)
 
         # --- Statusbar ---
 
@@ -146,9 +146,18 @@ class Controller(object):
         logd('cmd_quit called')
         self.root.quit()
 
+    def run(self):
+        self.root.mainloop()  # Run the Tk GUI
+
     def set_current_id(self, sid):
         self.current_id = sid
         self.current_id_var.set('Current Identity: {}'.format(sid))
+
+    def show_circuit(self, circuit):
+        self.treeview.show_circuit(circuit)
+
+    def show_stream(self, stream):
+        self.treeview.show_stream(stream)
 
 
 
@@ -183,21 +192,22 @@ class OutputW(object):
 
 
 class TorLink(object):
-    def __init__(self, controller, treeview):
+    def __init__(self, controller, portlist=TOR_PORTS):
         self.controller = controller
-        self.treeview = treeview
+        self.treeview = controller.treeview
         self.tor = None
         self.circuits = {}
         self.streams = defaultdict(dict)
 
         # Initialise the link to Tor
-        for port in TOR_PORTS:
+        for port in portlist:
             try:
                 #print('Trying port ', port)
                 tor = stem.control.Controller.from_port(port=port)
                 tor.authenticate()
                 print('Connected to Tor on port:%s' % port)
                 self.tor = tor
+                self.port = port
                 break
             except stem.SocketError:
                 #print('stem.SocketError')
@@ -221,10 +231,10 @@ class TorLink(object):
 
         # List the existing circuits and streams
         for circuit in sorted(tor.get_circuits(), key=lambda circuit: int(circuit.id)):
-            self.treeview.show_circuit(self._enhance_circuit(circuit))
+            controller.show_circuit(self._enhance_circuit(circuit))
             #self.controller.output(circuit)
         for stream in sorted(tor.get_streams(), key=lambda stream: int(stream.id)):
-            self.treeview.show_stream(stream.__dict__)
+            controller.show_stream(stream.__dict__)
 
     def handle_event(self, event):
         #print(dir(event))
@@ -237,7 +247,7 @@ class TorLink(object):
 
     def handle_circuit_event(self, event):
         try:
-            self.treeview.show_circuit(self._enhance_circuit(event))
+            self.controller.show_circuit(self._enhance_circuit(event))
         except Exception as e:
             print('Circuit event error:')
             print(e)
@@ -256,7 +266,7 @@ class TorLink(object):
                 eventd = event.__dict__.copy()
                 # Add our saved data
                 eventd.update(self.streams[event.id])
-                self.treeview.show_stream(eventd)
+                self.controller.show_stream(eventd)
         except Exception as e:
             print('Stream event error:')
             print(e)
