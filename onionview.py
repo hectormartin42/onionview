@@ -26,7 +26,6 @@ Usage: onionview [port]
 
 '''
 ''' TODO:
-+ Display Port in UI
 + Warning against posting screenshots
 + Move Streams if the circuit id has changed ('DETACHED')
 + Remove closed circuits and streams after a time delay
@@ -39,11 +38,6 @@ Tor control protocol spec:
 '''
 __version_info__ = (0, 0, 1)
 
-TOR_PORTS=(
-    9153, # TorMessenger
-    9151, # TorBrowserBundle
-    9051, # System
-    )
 
 
 import logging
@@ -64,14 +58,6 @@ from datetime import datetime
 import stem.control
 import stem
 
-COLORS = {
-          'mytext': '#f69454',  #  tangerine
-          'theirtext': '#ee693f',  #  carrot
-          'msgtextbackgroun': '#fcfdfe',  # off-white
-          'daemonbroken': '#cf3721',  # tomato
-          'daemonrunning': '#739f3d',  # pear green
-         }
-
 
 def main(argv):
     #~ logging.basicConfig(
@@ -80,10 +66,11 @@ def main(argv):
                     #~ level=logging.DEBUG,
                     #~ #level = logging.ERROR,
                     #~ )
-    global TOR_PORTS
     if len(argv) > 1 and argv[1].isdigit():
-        TOR_PORTS = (int(argv[1]),)
-    Controller(portlist=TOR_PORTS).run()
+        port = int(argv[1])
+        Controller(portlist=(port,)).run()
+    else:
+        Controller().run()
 
 
 
@@ -92,18 +79,18 @@ class Controller(object):
     def output(self, text):
         self.output_w.append_text('{}\n'.format(text))
 
-    def __init__(self, portlist):
+    def __init__(self, portlist=None):
         self.root = None  # Main Tk window
         self.output_w = None  # Text output widget
         self.treeview = None
 
         self._init_ui()
-        self.torlink_obj = TorLink(controller=self, portlist=portlist)
+        self.model = TorLink(controller=self, portlist=portlist)
+        self.root.title('%s - OnionView' % self.model.port)
 
     def _init_ui(self):
         # --- Tk init ---
         self.root = root = tk.Tk()
-        root.title('OnionView')
         #~ root.geometry('1000x1000')
 
         # Catch the close button
@@ -112,7 +99,7 @@ class Controller(object):
         #root.createcommand('exit', self.cmd_quit)
 
         root.option_add('*tearOff', False)
-        root.bind('<Alt_L><q>', self.cmd_quit)
+        root.bind('<Alt-q>', self.cmd_quit)
 
         # --- Main TreeView ---
 
@@ -191,7 +178,14 @@ class OutputW(object):
 
 
 class TorLink(object):
-    def __init__(self, controller, portlist=TOR_PORTS):
+    TOR_PORTS=(
+        9153, # TorMessenger
+        9151, # TorBrowserBundle
+        9051, # System
+        )
+    def __init__(self, controller, portlist=None):
+        if portlist is None:
+            portlist = self.TOR_PORTS
         self.controller = controller
         self.treeview = controller.treeview
         self.tor = None
@@ -212,7 +206,7 @@ class TorLink(object):
                 #print('stem.SocketError')
                 pass
         else:
-            sys.exit('Unable to contact Tor process')
+            sys.exit('Unable to contact Tor process on ports: %s' % portlist)
 
         # Set up callbacks for the events we want
         EventType = stem.control.EventType
@@ -312,16 +306,13 @@ class TreeView(object):
         parent.columnconfigure(0, weight=1)
         parent.rowconfigure(0, weight=1)
 
-        self.tree_w.bind('<<TreeviewSelect>>', self.cmd_select)
+        #~ self.tree_w.bind('<<TreeviewSelect>>', self.cmd_select)
 
     def cmd_select(self, event):
         '''Figures out which item was clicked and invokes relevant
         functionality.'''
         itemid = self.tree_w.focus()
         self.controller.output(itemid)
-        #~ if itemid.startswith('peers.'):
-            #~ sid = itemid[6:]
-            #~ self.controller.peer_tab_obj.switch_to_sid(sid)
 
     def show_circuit(self, circuit, position='end'):
         '''Show a circuit in the treeview'''
