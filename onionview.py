@@ -29,7 +29,6 @@ Usage: onionview [port]
 + Display Port in UI
 + Warning against posting screenshots
 + Move Streams if the circuit id has changed ('DETACHED')
-+ Display SOCKS username for streams/circuits
 + Remove closed circuits and streams after a time delay
 + Highlight new entries in treeview for 1 second
 
@@ -169,7 +168,7 @@ class OutputW(object):
         self.frame = ttk.Frame(parent)#, borderwidth=10, relief='ridge')#, padding=10
         self.frame.pack(fill=tk.BOTH)
 
-        self.output_w = tk.Text(self.frame, width=100, height=15)
+        self.output_w = tk.Text(self.frame, width=120, height=15)
         self.output_w.grid(row=0, column=0, sticky=tk.NSEW)
         #~ self.output_w.insert('1.0', 'Output will appear here.')
 
@@ -239,7 +238,7 @@ class TorLink(object):
     def handle_event(self, event):
         #print(dir(event))
         arrived_at = datetime.fromtimestamp(event.arrived_at).time()
-        self.controller.output('{} {}'.format(arrived_at, event))
+        self.controller.output('_event {} {}'.format(arrived_at, event))
 
     def handle_bw_event(self, event):
         if event.read or event.written:
@@ -247,6 +246,7 @@ class TorLink(object):
 
     def handle_circuit_event(self, event):
         try:
+            self.controller.output('circ_event '+ str(event))
             self.controller.show_circuit(self._enhance_circuit(event))
         except Exception as e:
             print('Circuit event error:')
@@ -295,8 +295,8 @@ class TreeView(object):
         self.controller = controller
 
         #columns = ('id', 'Created', 'Path')
-        self.tree_w = ttk.Treeview(parent, height=20)#,columns=columns)#, show='headings')
-        self.tree_w.column('#0', width=700, stretch=True)
+        self.tree_w = ttk.Treeview(parent, height=30)#,columns=columns)#, show='headings')
+        self.tree_w.column('#0', stretch=True)#, width=900
         self.tree_w.tag_configure('closed', foreground='grey')
         #print(self.tree_w['columns'])
         #for column in self.tree_w['columns']:
@@ -325,12 +325,28 @@ class TreeView(object):
 
     def show_circuit(self, circuit, position='end'):
         '''Show a circuit in the treeview'''
+        #print('show_circuit #{} Type{}'.format(circuit.id, type(circuit)))
+
         disp = '{0.id} {0.created} {0.status}: '.format(circuit)
         pathbits = []
         for relay in circuit.pathplus:
             # relay = (fp, name, addr, country)
             pathbits.append('{3} {1}'.format(*relay))
         disp += ' > '.join(pathbits)
+        kwargs = circuit.keyword_args
+        try:
+            disp += ' : {}:{}'.format(
+                kwargs['SOCKS_USERNAME'], kwargs['SOCKS_PASSWORD'])
+        except KeyError as e:
+            pass
+            #print('raw_content:{!r}'.format(circuit.raw_content))
+            #print(dir(circuit))
+            #print(circuit.positional_args)
+            #print(circuit.keyword_args)
+        try:
+            disp += ' : {}'.format(kwargs['BUILD_FLAGS'])
+        except KeyError:
+            pass
         item_id = 'circ.%s' % circuit.id
 
         if self.tree_w.exists(item_id):
