@@ -26,7 +26,6 @@ Usage: onionview [port]
 
 '''
 ''' TODO:
-+ Warning against posting screenshots
 + Move Streams if the circuit id has changed ('DETACHED')
 + Remove closed circuits and streams after a time delay
 + Highlight new entries in treeview for 1 second
@@ -45,11 +44,9 @@ _logger = logging.getLogger(__name__)
 
 try:
     import tkinter as tk
-    from tkinter import messagebox
     import tkinter.ttk as ttk
 except ImportError:
     import Tkinter as tk
-    import tkMessageBox as messagebox
     import ttk
 
 #import time
@@ -100,6 +97,15 @@ class Controller(object):
 
         root.option_add('*tearOff', False)
         root.bind('<Alt-q>', self.cmd_quit)
+
+        # --- Warning message ---
+
+        warn = ttk.Label(root, background='#EE3338',
+            justify='center',
+            text=' Warning: If you post a screenshot of the information '
+            'below, you may compromise your anonymity.')
+        warn.grid(row=10, column=0, columnspan=2, sticky='ns',
+            ipadx='10', ipady='5')
 
         # --- Main TreeView ---
 
@@ -289,7 +295,7 @@ class TreeView(object):
         self.controller = controller
 
         #columns = ('id', 'Created', 'Path')
-        self.tree_w = ttk.Treeview(parent, height=30)#,columns=columns)#, show='headings')
+        self.tree_w = ttk.Treeview(parent, height=30, show='tree')#,columns=columns)#
         self.tree_w.column('#0', stretch=True)#, width=900
         self.tree_w.tag_configure('closed', foreground='grey')
         #print(self.tree_w['columns'])
